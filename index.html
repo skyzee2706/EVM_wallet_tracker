@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EVM Wallet Tracker | Engine v2.6</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'JetBrains Mono', monospace; background-color: #050505; color: #e5e7eb; }
+        .animate-spin-slow { animation: spin 3s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- ICONS ---
+        const Icon = ({ d, className, color }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={{color: color}}>
+                {d}
+            </svg>
+        );
+
+        const Search = (p) => <Icon {...p} d={<><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></>} />;
+        const Wallet = (p) => <Icon {...p} d={<><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></>} />;
+        const Layers = (p) => <Icon {...p} d={<><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></>} />;
+        const RefreshCw = (p) => <Icon {...p} d={<><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></>} />;
+        const ShieldCheck = (p) => <Icon {...p} d={<><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></>} />;
+        const Zap = (p) => <Icon {...p} d={<><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></>} />;
+        const DollarSign = (p) => <Icon {...p} d={<><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>} />;
+        const Activity = (p) => <Icon {...p} d={<><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></>} />;
+        const Crown = (p) => <Icon {...p} d={<><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/></>} />;
+        const Ghost = (p) => <Icon {...p} d={<><path d="M9 10h.01"/><path d="M15 10h.01"/><path d="M12 2a8 8 0 0 0-8 8v12l3-3 2.5 2.5L12 19l2.5 2.5L17 19l3 3V10a8 8 0 0 0-8-8z"/></>} />;
+        const Fish = (p) => <Icon {...p} d={<><path d="M6.5 12c.94-3.46 4.94-6 8.5-6 3.56 0 6.06 2.54 7 6-.94 3.47-3.44 6-7 6s-7.56-2.53-8.5-6Z"/><path d="M18 12v.5"/><path d="M16 17.93a9.77 9.77 0 0 1 0-11.86"/><path d="M7 10.67C7 8 5.58 5.97 2.73 5.5c-1 1.5-1 5 .23 6.5-1.24 1.5-1.24 5-.23 6.5C5.58 18.03 7 16 7 13.33"/><path d="M10.42 15.15c.64-.23 1.09-.56 1.34-1.15.24-.59.24-1.41 0-2-.25-.59-.7-1.15-1.34-1.38"/></>} />;
+        const Anchor = (p) => <Icon {...p} d={<><circle cx="12" cy="5" r="3"/><line x1="12" x2="12" y1="22" y2="8"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/></>} />;
+        const Briefcase = (p) => <Icon {...p} d={<><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></>} />;
+
+        // --- CONFIG ---
+        const FALLBACK_PRICES = {
+            'ETH': 3350, 'BNB': 610, 'MATIC': 0.5, 'AVAX': 38, 'FTM': 0.7, 
+            'CRO': 0.1, 'GLMR': 0.2, 'CELO': 0.6, 'METIS': 45, 'CORE': 1.1, 
+            'TLOS': 0.2, 'ONE': 0.015, 'MNT': 0.8, 'KLAY': 0.15, 'OKT': 12, 'OKB': 45
+        };
+
+        const CHAINS = [
+            { id: 1, name: 'Ethereum', rpc: 'https://eth.llamarpc.com', symbol: 'ETH', coinId: 'ethereum' },
+            { id: 8453, name: 'Base', rpc: 'https://mainnet.base.org', symbol: 'ETH', coinId: 'ethereum' },
+            { id: 42161, name: 'Arbitrum One', rpc: 'https://arb1.arbitrum.io/rpc', symbol: 'ETH', coinId: 'ethereum' },
+            { id: 10, name: 'Optimism', rpc: 'https://mainnet.optimism.io', symbol: 'ETH', coinId: 'ethereum' },
+            { id: 56, name: 'BSC', rpc: 'https://binance.llamarpc.com', symbol: 'BNB', coinId: 'binancecoin' },
+            { id: 137, name: 'Polygon', rpc: 'https://polygon-rpc.com', symbol: 'MATIC', coinId: 'matic-network' },
+            { id: 43114, name: 'Avalanche', rpc: 'https://api.avax.network/ext/bc/C/rpc', symbol: 'AVAX', coinId: 'avalanche-2' },
+            
+            // FIXED: Official Fantom RPC
+            { id: 250, name: 'Fantom', rpc: 'https://rpc.fantom.network', symbol: 'FTM', coinId: 'fantom' },
+            
+            { id: 324, name: 'zkSync Era', rpc: 'https://mainnet.era.zksync.io', symbol: 'ETH', coinId: 'ethereum' },
+            { id: 59144, name: 'Linea', rpc: 'https://rpc.linea.build', symbol: 'ETH', coinId: 'ethereum' },
+            { id: 534352, name: 'Scroll', rpc: 'https://rpc.scroll.io', symbol: 'ETH', coinId: 'ethereum' },
+            { id: 81457, name: 'Blast', rpc: 'https://rpc.blast.io', symbol: 'ETH', coinId: 'ethereum' },
+            { id: 169, name: 'Manta Pacific', rpc: 'https://pacific-rpc.manta.network/http', symbol: 'ETH', coinId: 'ethereum' },
+            { id: 5000, name: 'Mantle', rpc: 'https://rpc.mantle.xyz', symbol: 'MNT', coinId: 'mantle' },
+            { id: 100, name: 'Gnosis', rpc: 'https://rpc.gnosischain.com', symbol: 'xDAI', coinId: 'dai' },
+            { id: 1101, name: 'Polygon zkEVM', rpc: 'https://zkevm-rpc.com', symbol: 'ETH', coinId: 'ethereum' },
+            { id: 42220, name: 'Celo', rpc: 'https://forno.celo.org', symbol: 'CELO', coinId: 'celo' },
+            { id: 25, name: 'Cronos', rpc: 'https://evm.cronos.org', symbol: 'CRO', coinId: 'crypto-com-chain' },
+            { id: 1088, name: 'Metis', rpc: 'https://andromeda.metis.io/?owner=1088', symbol: 'METIS', coinId: 'metis-token' },
+            { id: 1116, name: 'Core DAO', rpc: 'https://rpc.coredao.org', symbol: 'CORE', coinId: 'coredaoorg' },
+            
+            // FIXED: Official Telos RPC
+            { id: 40, name: 'Telos', rpc: 'https://mainnet.telos.net/evm', symbol: 'TLOS', coinId: 'telos' },
+            
+            { id: 204, name: 'opBNB', rpc: 'https://opbnb-mainnet-rpc.bnbchain.org', symbol: 'BNB', coinId: 'binancecoin' },
+            { id: 34443, name: 'Mode', rpc: 'https://mainnet.mode.network', symbol: 'ETH', coinId: 'ethereum' },
+            { id: 1284, name: 'Moonbeam', rpc: 'https://rpc.api.moonbeam.network', symbol: 'GLMR', coinId: 'moonbeam' },
+            
+            // FIXED: Official Kaia RPC
+            { id: 8217, name: 'Kaia', rpc: 'https://public-en-cypress.klaytn.net', symbol: 'KLAY', coinId: 'klay-token' },
+            
+            { id: 1313161554, name: 'Aurora', rpc: 'https://mainnet.aurora.dev', symbol: 'ETH', coinId: 'ethereum' },
+            { id: 7777777, name: 'Zora', rpc: 'https://rpc.zora.energy', symbol: 'ETH', coinId: 'ethereum' },
+            { id: 1666600000, name: 'Harmony', rpc: 'https://api.harmony.one', symbol: 'ONE', coinId: 'harmony' },
+            { id: 196, name: 'OKX X Layer', rpc: 'https://rpc.xlayer.tech', symbol: 'OKB', coinId: 'okb' },
+            { id: 66, name: 'OKTC', rpc: 'https://exchainrpc.okex.org', symbol: 'OKT', coinId: 'okc-token' }
+        ];
+
+        const shortenAddress = (addr) => `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+        const formatUSD = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
+
+        const getTier = (volume) => {
+            if (volume === 0) return { label: "GHOST", icon: <Ghost size={24} />, color: "text-gray-500", bg: "bg-gray-500/10", border: "border-gray-500/20" };
+            if (volume < 1000) return { label: "PLANKTON", icon: <Activity size={24} />, color: "text-emerald-200", bg: "bg-emerald-500/10", border: "border-emerald-500/20" };
+            if (volume < 10000) return { label: "SHRIMP", icon: <Fish size={24} />, color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20" };
+            if (volume < 50000) return { label: "DOLPHIN", icon: <Anchor size={24} />, color: "text-cyan-400", bg: "bg-cyan-500/10", border: "border-cyan-500/20" };
+            if (volume < 250000) return { label: "SHARK", icon: <Zap size={24} />, color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20" };
+            if (volume < 1000000) return { label: "WHALE", icon: <Crown size={24} />, color: "text-pink-400", bg: "bg-pink-500/10", border: "border-pink-500/20" };
+            return { label: "KRAKEN", icon: <ShieldCheck size={24} />, color: "text-red-500", bg: "bg-red-500/10", border: "border-red-500/20" };
+        };
+
+        // --- MAIN COMPONENT ---
+        function App() {
+            const [address, setAddress] = useState('');
+            const [isScanning, setIsScanning] = useState(false);
+            const [results, setResults] = useState([]);
+            const [progress, setProgress] = useState(0);
+            const [metrics, setMetrics] = useState({ totalNetWorth: 0, totalTx: 0, estimatedVolume: 0, estimatedTotalHoldings: 0 });
+            const [prices, setPrices] = useState({});
+            const [debugMsg, setDebugMsg] = useState('');
+
+            const fetchPrices = async () => {
+                try {
+                    const coinIds = [...new Set(CHAINS.map(c => `coingecko:${c.coinId}`))].join(',');
+                    const res = await fetch(`https://coins.llama.fi/prices/current/${coinIds}`);
+                    const data = await res.json();
+                    const newPrices = data.coins || {};
+                    setPrices(newPrices);
+                    return newPrices; 
+                } catch (error) { 
+                    console.error("API Price Error: Using Fallback", error);
+                    return {}; 
+                }
+            };
+
+            const rpcCall = async (url, method, params) => {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 6000); 
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 }),
+                        signal: controller.signal
+                    });
+                    clearTimeout(timeoutId);
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const data = await res.json();
+                    if (data.error) throw new Error(data.error.message);
+                    return data.result;
+                } catch (e) {
+                    clearTimeout(timeoutId);
+                    throw e;
+                }
+            };
+
+            const checkChain = async (chain, userAddress) => {
+                try {
+                    const balancePromise = rpcCall(chain.rpc, "eth_getBalance", [userAddress, "latest"]);
+                    const noncePromise = rpcCall(chain.rpc, "eth_getTransactionCount", [userAddress, "latest"]);
+                    let balanceEth = 0;
+                    let txCount = 0;
+                    let success = false;
+
+                    try { const balanceHex = await balancePromise; balanceEth = Number(BigInt(balanceHex)) / 1e18; success = true; } catch (e) { /* Silent Fail */ }
+                    try { const nonceHex = await noncePromise; txCount = parseInt(nonceHex, 16); success = true; } catch (e) { /* Silent Fail */ }
+
+                    return { ...chain, balance: balanceEth, txCount, success };
+                } catch (error) {
+                    // Return 0 values on error instead of crashing
+                    return { ...chain, balance: 0, txCount: 0, success: false };
+                }
+            };
+
+            const handleScan = async () => {
+                if (!address || !address.startsWith('0x') || address.length !== 42) {
+                    setDebugMsg("Invalid Address (must start with 0x)");
+                    return;
+                }
+                setIsScanning(true);
+                setResults([]);
+                setProgress(0);
+                setMetrics({ totalNetWorth: 0, totalTx: 0, estimatedVolume: 0, estimatedTotalHoldings: 0 });
+                setDebugMsg('');
+                
+                const currentPrices = await fetchPrices();
+
+                const scannedResults = [];
+                let scannedCount = 0;
+                let runningNetWorth = 0;
+                let runningTx = 0;
+                let runningVolumeEst = 0;
+                let runningTotalHoldingsEst = 0;
+
+                const batchSize = 6;
+                for (let i = 0; i < CHAINS.length; i += batchSize) {
+                    const batch = CHAINS.slice(i, i + batchSize);
+                    const promises = batch.map(chain => checkChain(chain, address));
+                    const batchResults = await Promise.all(promises);
+                    
+                    batchResults.forEach(res => {
+                        if (res.success) {
+                            const priceKey = `coingecko:${res.coinId}`;
+                            let price = currentPrices[priceKey]?.price;
+                            if (!price) {
+                                price = FALLBACK_PRICES[res.symbol] || 0;
+                            }
+                            
+                            const nativeValue = res.balance * price;
+                            const avgTradeSize = Math.random() * (200 - 10) + 10;
+                            const txVolumeEst = res.txCount * avgTradeSize;
+                            let totalPortfolioEst = nativeValue;
+                            if (nativeValue > 0.05) { 
+                                totalPortfolioEst = nativeValue * 5; 
+                            }
+
+                            const estimatedVol = Math.floor(txVolumeEst + (totalPortfolioEst * 2)); 
+
+                            res.usdValue = nativeValue;
+                            res.estHoldings = totalPortfolioEst;
+                            res.price = price;
+                            res.estimatedVol = estimatedVol;
+
+                            runningNetWorth += nativeValue;
+                            runningTotalHoldingsEst += totalPortfolioEst;
+                            runningTx += res.txCount;
+                            runningVolumeEst += estimatedVol;
+                        } else {
+                            // Fallback default jika gagal, tidak perlu log error
+                            res.usdValue = 0;
+                            res.estHoldings = 0;
+                            res.price = 0;
+                            res.estimatedVol = 0;
+                        }
+                        scannedResults.push(res);
+                    });
+
+                    scannedCount += batch.length;
+                    setProgress((scannedCount / CHAINS.length) * 100);
+                    const sorted = [...scannedResults].sort((a, b) => (b.estimatedVol || 0) - (a.estimatedVol || 0));
+                    setResults(sorted);
+                    setMetrics({ 
+                        totalNetWorth: runningNetWorth, 
+                        totalTx: runningTx, 
+                        estimatedVolume: runningVolumeEst,
+                        estimatedTotalHoldings: runningTotalHoldingsEst
+                    });
+                }
+                setIsScanning(false);
+            };
+
+            // Handler untuk tombol Enter
+            const handleKeyDown = (event) => {
+                if (event.key === 'Enter' && !isScanning) {
+                    handleScan();
+                }
+            };
+
+            const tier = getTier(metrics.estimatedVolume);
+
+            return (
+                <div className="min-h-screen p-4 md:p-8">
+                    <div className="max-w-6xl mx-auto">
+                        
+                        {/* HEADER */}
+                        <div className="mb-8 border-b border-gray-800 pb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div>
+                                <h1 className="text-3xl md:text-4xl font-black flex items-center gap-3 text-white tracking-tighter">
+                                    <span className="bg-indigo-600 text-white p-1 rounded">EVM</span> WALLET TRACKER
+                                </h1>
+                                <p className="text-indigo-400 text-xs mt-2 font-bold tracking-widest uppercase">ENGINE v2.6</p>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-[10px] text-gray-500 uppercase tracking-widest">Coverage</div>
+                                <div className="text-xl font-bold text-white">{CHAINS.length} Networks</div>
+                            </div>
+                        </div>
+
+                        {/* INPUT */}
+                        <div className="bg-[#0a0a0a] border border-gray-800 p-6 rounded-2xl mb-8 shadow-2xl shadow-indigo-900/10 relative overflow-hidden">
+                            <div className="relative z-10">
+                                <label className="block text-xs font-bold mb-3 uppercase tracking-wider text-indigo-400">Target Wallet Address</label>
+                                <div className="flex flex-col md:flex-row gap-4">
+                                    <div className="relative flex-grow group">
+                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                            <Wallet className="h-5 w-5 text-gray-500" />
+                                        </div>
+                                        <input 
+                                            type="text" 
+                                            value={address} 
+                                            onChange={(e) => setAddress(e.target.value)} 
+                                            onKeyDown={handleKeyDown} // Fitur ENTER
+                                            placeholder="0x..." 
+                                            className="w-full bg-[#111] border border-gray-800 text-white rounded-xl py-4 pl-12 pr-4 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 placeholder-gray-700 transition-all text-sm" 
+                                        />
+                                    </div>
+                                    <button onClick={handleScan} disabled={isScanning} className={`px-8 py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${isScanning ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500 text-white hover:shadow-indigo-500/25 hover:-translate-y-0.5'}`}>
+                                        {isScanning ? <RefreshCw className="animate-spin h-5 w-5" /> : <Search className="h-5 w-5" />}
+                                        {isScanning ? 'ANALYZING...' : 'SCAN PROFILE'}
+                                    </button>
+                                </div>
+                                {debugMsg && <p className="text-red-400 text-xs mt-2 ml-1">{debugMsg}</p>}
+                            </div>
+                        </div>
+
+                        {/* PROGRESS */}
+                        {isScanning && (
+                            <div className="mb-12">
+                                <div className="flex justify-between text-xs mb-2 text-indigo-400 font-bold tracking-wider">
+                                    <span className="animate-pulse">GATHERING INTELLIGENCE...</span>
+                                    <span>{Math.round(progress)}%</span>
+                                </div>
+                                <div className="w-full bg-gray-900 rounded-full h-2 overflow-hidden">
+                                    <div className="bg-gradient-to-r from-indigo-600 to-purple-500 h-full transition-all duration-300 ease-out shadow-[0_0_10px_#4f46e5]" style={{ width: `${progress}%` }}></div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* RESULTS */}
+                        {results.length > 0 && (
+                            <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+                                    
+                                    {/* TIER CARD */}
+                                    <div className={`lg:col-span-4 rounded-3xl border ${tier.border} ${tier.bg} p-8 flex flex-col items-center justify-center text-center relative overflow-hidden shadow-2xl`}>
+                                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.1)_0%,transparent_50%)]"></div>
+                                        <div className={`w-24 h-24 rounded-full bg-black/30 border-2 ${tier.border} flex items-center justify-center mb-6 text-white shadow-lg backdrop-blur-sm`}>
+                                            {tier.icon}
+                                        </div>
+                                        <h2 className={`text-3xl font-black tracking-tighter text-white mb-2`}>{tier.label}</h2>
+                                        <div className={`text-xs font-bold px-3 py-1 rounded-full border ${tier.border} bg-black/20 ${tier.color} uppercase tracking-widest`}>Activity Tier</div>
+                                        <div className="mt-8 w-full pt-6 border-t border-white/10">
+                                            <div className="text-[10px] text-gray-400 uppercase tracking-widest mb-1">Estimated Lifetime Vol</div>
+                                            <div className="text-3xl font-bold text-white tracking-tight">{formatUSD(metrics.estimatedVolume)}</div>
+                                            <div className="text-[10px] text-gray-500 mt-2 italic">*Based on heuristic analysis</div>
+                                        </div>
+                                    </div>
+
+                                    {/* METRICS */}
+                                    <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="bg-[#0f0f0f] border border-gray-800 p-6 rounded-3xl flex flex-col justify-between hover:border-indigo-500/30 transition-colors">
+                                            <div className="flex justify-between items-start">
+                                                <div className="p-3 bg-indigo-900/20 rounded-xl text-indigo-400"><DollarSign size={24} /></div>
+                                                <span className="text-[10px] text-gray-500 uppercase border border-gray-800 px-2 py-1 rounded">Est. Total Portfolio</span>
+                                            </div>
+                                            <div>
+                                                <div className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-1">Current Assets</div>
+                                                <div className="text-3xl font-bold text-white">{formatUSD(metrics.estimatedTotalHoldings)}</div>
+                                                <div className="text-[10px] text-gray-600 mt-1">Incl. Tokens (Est. 5x Native)</div>
+                                            </div>
+                                        </div>
+                                        <div className="bg-[#0f0f0f] border border-gray-800 p-6 rounded-3xl flex flex-col justify-between hover:border-purple-500/30 transition-colors">
+                                            <div className="flex justify-between items-start">
+                                                <div className="p-3 bg-purple-900/20 rounded-xl text-purple-400"><Activity size={24} /></div>
+                                                <span className="text-[10px] text-gray-500 uppercase border border-gray-800 px-2 py-1 rounded">On-Chain</span>
+                                            </div>
+                                            <div>
+                                                <div className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-1">Total Transactions</div>
+                                                <div className="text-3xl font-bold text-white">{metrics.totalTx.toLocaleString()}</div>
+                                            </div>
+                                        </div>
+                                        <div className="bg-[#0f0f0f] border border-gray-800 p-6 rounded-3xl flex flex-col justify-between hover:border-emerald-500/30 transition-colors sm:col-span-2">
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <Layers size={20} className="text-emerald-400" />
+                                                <span className="text-gray-400 font-bold">Active Networks Detected</span>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {results.filter(r => r.txCount > 0 || r.balance > 0).slice(0, 12).map(chain => (
+                                                    <span key={chain.id} className="px-3 py-1.5 bg-gray-900 border border-gray-800 rounded-lg text-xs font-mono text-gray-300">{chain.name}</span>
+                                                ))}
+                                                {results.filter(r => r.txCount > 0 || r.balance > 0).length > 12 && (
+                                                    <span className="px-3 py-1.5 bg-gray-900 border border-gray-800 rounded-lg text-xs font-mono text-gray-500">+{results.filter(r => r.txCount > 0 || r.balance > 0).length - 12} more</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* CHAIN LIST */}
+                                <div className="flex items-center justify-between mb-4 px-2">
+                                    <h3 className="text-white font-bold text-lg">Network Breakdown</h3>
+                                    <span className="text-xs text-gray-500">Sorted by Estimated Volume</span>
+                                </div>
+                                <div className="space-y-3 pb-20">
+                                    {results.map((chain) => {
+                                        const isActive = chain.txCount > 0 || chain.balance > 0;
+                                        if (!isActive) return null;
+                                        return (
+                                            <div key={chain.id} className="relative rounded-xl border border-gray-800 bg-[#0f0f0f] grid grid-cols-1 md:grid-cols-12 gap-4 p-5 items-center hover:border-indigo-500/50 hover:shadow-lg hover:shadow-indigo-500/5 transition-all">
+                                                <div className="col-span-4 flex items-center gap-4">
+                                                    <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_currentColor] ${chain.success ? 'bg-emerald-500 text-emerald-500' : 'bg-red-500 text-red-500'}`}></div>
+                                                    <div>
+                                                        <div className="font-bold text-white text-lg">{chain.name}</div>
+                                                        <div className="text-[10px] text-gray-500 uppercase font-semibold tracking-wider">{chain.rpc.includes('llamarpc') ? 'LLAMA RPC' : 'PUBLIC NODE'}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="col-span-3 md:text-right">
+                                                    <div className="text-[10px] text-gray-500 uppercase font-bold mb-1 md:hidden">Est. Volume</div>
+                                                    <div className="font-mono font-bold text-indigo-300 text-lg">{formatUSD(chain.estimatedVol || 0)}</div>
+                                                </div>
+                                                <div className="col-span-3 md:text-right">
+                                                    <div className="text-[10px] text-gray-500 uppercase font-bold mb-1 md:hidden">Current Assets (Est)</div>
+                                                    <div className="font-mono font-bold text-white text-lg">{formatUSD(chain.estHoldings || 0)}</div>
+                                                    <div className="text-[10px] text-gray-600">Native: {chain.balance.toFixed(4)} {chain.symbol}</div>
+                                                </div>
+                                                <div className="col-span-2 md:text-right">
+                                                    <div className="text-[10px] text-gray-500 uppercase font-bold mb-1 md:hidden">Tx Count</div>
+                                                    <div className={`font-mono font-bold text-xl ${chain.txCount > 0 ? 'text-white' : 'text-gray-800'}`}>{chain.txCount}</div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
